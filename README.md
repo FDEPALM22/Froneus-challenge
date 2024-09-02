@@ -7,7 +7,7 @@ Este microservicio, desarrollado con Spring Boot, implementa una arquitectura ev
 ## Características
 
 - **Arquitectura Event-Driven**: Emite eventos cuando el estado de un usuario cambia.
-- **Apache Kafka**: Utiliza Kafka como broker de mensajes para publicar y consumir eventos.
+- **Apache Kafka**: Utiliza Kafka como broker de mensajes para publicar eventos.
 - **Microservicios**: Desarrollado siguiendo principios de microservicios y Hexagonal Architecture.
 
 ## Tecnologías utilizadas
@@ -36,16 +36,18 @@ spring.application.name=challenge
 kafka.bootstrap-servers=kafka1:29092
 kafka.topic.name=user-status-topic
 ```
-### 2. Docker Compose
-Para ejecutar Kafka y Zookeeper, puedes utilizar el siguiente docker-compose.yml:
+### 2. Construcción del proyecto
+Compila y empaqueta la aplicación con Maven:
 
-### Docker Compose Configuration
+```
+mvn clean install
+```
+### 3. Docker Compose
 
-Para ejecutar Kafka y Zookeeper, puedes utilizar el siguiente archivo `docker-compose.yml`:
+Para ejecutar Kafka,kafka UI, Zookeeper y el microservicio, puedes utilizar el siguiente archivo `docker-compose.yml`:
 
 ```yaml
 version: '3.8'
-
 services:
   zookeeper:
     image: bitnami/zookeeper:3.9.1
@@ -67,7 +69,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_CFG_LISTENERS: INTERNAL://:9092,EXTERNAL://0.0.0.0:29092
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka1:9092,EXTERNAL://localhost:29092
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka1:9092,EXTERNAL://kafka1:29092
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
@@ -77,6 +79,27 @@ services:
       - "29092:29092"
     volumes:
       - kafka_data1:/bitnami/kafka
+    networks:
+      - kafka-network
+
+  producer:
+    image: openjdk:17-jdk-slim
+    container_name: producer
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_APPLICATION_NAME=challenge
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka1:29092
+      - SPRING_KAFKA_TOPIC_NAME=user-status-topic
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./target:/app
+    command: [ "java", "-jar", "/app/challenge-0.0.1-SNAPSHOT.jar" ]
+    depends_on:
+      - kafka1
     networks:
       - kafka-network
 
@@ -101,15 +124,11 @@ networks:
 volumes:
   kafka_data1:
     driver: local
-```
-### 3. Construcción del proyecto
-   Compila y empaqueta la aplicación con Maven:
 
 ```
-mvn clean install
-```
+
 ###  Productor Kafka
-Este microservicio actúa como productor de eventos en Kafka. Cuando el estado de un usuario cambia, se emite un evento al topic de Kafka configurado (user-status-topic).
+Este microservicio actúa como productor de eventos en Kafka. Cuando el estado de un usuario cambia, se emite un evento al topic de Kafka configurado como (user-status-topic).
 
 Ejemplo de Payload del evento:
 
@@ -136,8 +155,8 @@ curl -X 'POST' \
   -H 'Content-Type: application/json' \
   -d '{
   "id": "1",
-  "name": "Martin",
-  "active": false
+  "name": "Fernando",
+  "active": true
 }'
 ```
 
